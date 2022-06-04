@@ -38,7 +38,7 @@ import * as events from 'events';
 import * as NodePath from 'path';
 import * as os from 'os';
 
-export type ToolchainName = 'SDCC' | 'Keil_C51' | 'AC5' | 'AC6' | 'GCC' | 'IAR_STM8' | 'GNU_SDCC_STM8' | 'RISCV_GCC' | 'ANY_GCC' | 'None';
+export type ToolchainName = 'SDCC' | 'Keil_C51' | 'AC5' | 'AC6' | 'GCC' | 'MM32CC' | 'IAR_STM8' | 'GNU_SDCC_STM8' | 'RISCV_GCC' | 'ANY_GCC' | 'None';
 
 export interface IProjectInfo {
 
@@ -131,7 +131,7 @@ export class ToolchainManager {
 
     private readonly toolchainNames: ToolchainEnums = {
         'C51': ['Keil_C51', 'SDCC', 'IAR_STM8'/*, 'GNU_SDCC_STM8'*/],
-        'ARM': ['AC5', 'AC6', 'GCC'],
+        'ARM': ['AC5', 'AC6', 'GCC', 'MM32CC'],
         'RISC-V': ['RISCV_GCC'],
         'ANY-GCC': ['ANY_GCC']
     };
@@ -159,6 +159,7 @@ export class ToolchainManager {
         this.add(new AC5());
         this.add(new AC6());
         this.add(new GCC());
+        this.add(new MM32CC());
         this.add(new IARSTM8());
         this.add(new RISCV_GCC());
         this.add(new AnyGcc());
@@ -253,6 +254,8 @@ export class ToolchainManager {
                 return 'Small Device C Compiler';
             case 'GCC':
                 return 'GNU Arm Embedded Toolchain';
+            case 'MM32CC':
+                return 'MM32CC Embedded Toolchain';
             case 'IAR_STM8':
                 return 'IAR C Compiler for STM8';
             case 'GNU_SDCC_STM8':
@@ -373,6 +376,8 @@ export class ToolchainManager {
                 return File.fromArray([settingManager.GetC51Dir().path, 'BIN']);
             case 'GCC':
                 return File.fromArray([settingManager.getGCCDir().path, 'bin']);
+            case 'MM32CC':
+                return File.fromArray([settingManager.getMM32CCDir().path, 'bin']);    
             case 'IAR_STM8':
                 return File.fromArray([settingManager.getIARForStm8Dir().path, 'stm8', 'bin']);
             case 'SDCC':
@@ -1639,6 +1644,226 @@ class GCC implements IToolchian {
                 "remove-unused-input-sections": true,
                 "LD_FLAGS": "--specs=nosys.specs --specs=nano.specs",
                 "LIB_FLAGS": "-lm"
+            }
+        };
+    }
+}
+
+class MM32CC implements IToolchian {
+
+    readonly version = 13;
+
+    readonly settingName: string = 'EIDE.MM.MM32CC.InstallDirectory';
+
+    readonly categoryName: string = 'MM32CC';
+
+    readonly name: ToolchainName = 'MM32CC';
+
+    readonly modelName: string = 'mm.mm32cc.model.json';
+
+    readonly configName: string = 'mm.options.mm32cc.json';
+
+    readonly verifyFileName: string = 'mm.mm32cc.verify.json';
+
+    constructor() {
+        // nothing todo
+    }
+    /* 
+        private getIncludeList(gccDir: string): string[] | undefined {
+            try {
+                const gccName = this.getToolPrefix() + 'gcc';
+                const cmdLine = `${gccName} ` + ['-xc++', '-E', '-v', '-', `<${platform.osGetNullDev()}`, '2>&1'].join(' ');
+                const lines = child_process.execSync(cmdLine, { cwd: gccDir }).toString().split(/\r\n|\n/);
+                const iStart = lines.findIndex((line) => { return line.startsWith('#include <...>'); });
+                const iEnd = lines.indexOf('End of search list.', iStart);
+                return lines.slice(iStart + 1, iEnd)
+                    .map((line) => { return new File(File.ToLocalPath(line.trim())); })
+                    .filter((file) => { return file.IsDir(); })
+                    .map((f) => {
+                        return f.path;
+                    });
+            } catch (error) {
+                // do nothing
+            }
+        }
+    
+        private getMacroList(gccDir: string): string[] | undefined {
+            try {
+                const gccName = this.getToolPrefix() + 'gcc';
+                const cmdLine = `${gccName} ` + ['-E', '-dM', '-', `<${platform.osGetNullDev()}`].join(' ');
+                const lines = child_process.execSync(cmdLine, { cwd: gccDir }).toString().split(/\r\n|\n/);
+                const results: string[] = [];
+                const mHandler = new MacroHandler();
+    
+                lines.filter((line) => { return line.trim() !== ''; })
+                    .forEach((line) => {
+                        const value = mHandler.toExpression(line);
+                        if (value) {
+                            results.push(value);
+                        }
+                    });
+    
+                return results;
+            } catch (error) {
+                // do nothing
+            }
+        } */
+
+    private getToolPrefix(): string {
+        return '';
+    }
+
+    //-----------
+
+    newInstance(): IToolchian {
+        return new MM32CC();
+    }
+
+    getGccFamilyCompilerPathForCpptools(): string | undefined {
+        const mm32cc = File.fromArray([this.getToolchainDir().path, 'bin', this.getToolPrefix() + `mm32cc${platform.exeSuffix()}`]);
+        return mm32cc.path;
+    }
+
+    getToolchainPrefix(): string {
+        return this.getToolPrefix();
+    }
+
+    updateCppIntellisenceCfg(builderOpts: ICompileOptions, cppToolsConfig: CppConfigItem): void {
+
+        cppToolsConfig.cStandard = 'c11';
+        cppToolsConfig.cppStandard = 'c++11';
+
+        cppToolsConfig.compilerArgs = ['-std=${c_cppStandard}', '-mthumb'];
+
+        // pass global args for cpptools
+        if (builderOpts.global) {
+
+            if (typeof builderOpts.global['cpuType'] == 'string') {
+                const cpuType = builderOpts.global['cpuType'];
+                cppToolsConfig.compilerArgs.push(`-mcpu=${cpuType}`);
+            }
+
+            if (typeof builderOpts.global['fpuType'] == 'string') {
+                const fpuType = builderOpts.global['fpuType'];
+                switch (fpuType) {
+                    case 'sp':
+                        cppToolsConfig.compilerArgs.push(`-mfpu=fpv5-sp-d16`);
+                        break;
+                    case 'dp':
+                        cppToolsConfig.compilerArgs.push(`-mfpu=fpv5-d16`);
+                        break;
+                    default:
+                        break;
+                }
+                if (['sp', 'dp'].includes(fpuType)) {
+                    if (typeof builderOpts.global['$float-abi-type'] == 'string') {
+                        const abiType = builderOpts.global['$float-abi-type'];
+                        cppToolsConfig.compilerArgs.push(`-mfloat-abi=${abiType}`);
+                    }
+                }
+            }
+
+            if (typeof builderOpts.global['misc-control'] == 'string') {
+                const pList = builderOpts.global['misc-control'].trim().split(/\s+/);
+                pList.forEach((p) => cppToolsConfig.compilerArgs?.push(p));
+            }
+        }
+
+        if (builderOpts["c/cpp-compiler"]) {
+
+            if (builderOpts["c/cpp-compiler"]['language-c']) {
+                cppToolsConfig.cStandard = builderOpts["c/cpp-compiler"]['language-c'];
+            }
+
+            if (builderOpts["c/cpp-compiler"]['language-cpp']) {
+                cppToolsConfig.cppStandard = builderOpts["c/cpp-compiler"]['language-cpp'];
+            }
+
+            if (typeof builderOpts["c/cpp-compiler"]['C_FLAGS'] == 'string') {
+                const pList = builderOpts['c/cpp-compiler']['C_FLAGS'].trim().split(/\s+/);
+                cppToolsConfig.cCompilerArgs = pList;
+            }
+
+            if (typeof builderOpts["c/cpp-compiler"]['CXX_FLAGS'] == 'string') {
+                const pList = builderOpts['c/cpp-compiler']['CXX_FLAGS'].trim().split(/\s+/);
+                cppToolsConfig.cppCompilerArgs = pList;
+            }
+        }
+    }
+
+    preHandleOptions(prjInfo: IProjectInfo, options: ICompileOptions): void {
+
+        // convert output lib commmand
+        if (options['linker'] && options['linker']['output-format'] === 'lib') {
+            options['linker']['$use'] = 'linker-lib';
+        }
+
+        // if region 'global' is not exist, create it
+        if (typeof options['global'] !== 'object') {
+            options['global'] = {};
+        }
+
+        // set tool prefix
+        options['global'].toolPrefix = '';
+    }
+
+    getInternalDefines<T extends BuilderConfigData>(builderCfg: T, builderOpts: ICompileOptions): string[] {
+        return [];
+    }
+
+    getCustomDefines(): string[] | undefined {
+        return undefined;
+    }
+
+    getToolchainDir(): File {
+        return SettingManager.GetInstance().getMM32CCDir();
+    }
+
+    getSystemIncludeList(builderOpts: ICompileOptions): string[] {
+        return [];
+    }
+
+    getForceIncludeHeaders(): string[] | undefined {
+        return [
+            ResManager.GetInstance().getGccForceIncludeHeaders().path
+        ];
+    }
+
+    getDefaultIncludeList(): string[] {
+        return [];
+    }
+
+    getLibDirs(): string[] {
+        return [];
+    }
+
+    getDefaultConfig(): ICompileOptions {
+        return <ICompileOptions>{
+            version: this.version,
+            beforeBuildTasks: [],
+            afterBuildTasks: [],
+            global: {
+                "$float-abi-type": 'softfp',
+                "output-debug-info": 'enable'
+            },
+            'c/cpp-compiler': {
+                "language-c": "c11",
+                "language-cpp": "c++11",
+                "optimization": 'level-debug',
+                "warnings": "all-warnings",
+                "one-elf-section-per-function": true,
+                "one-elf-section-per-data": true,
+                "C_FLAGS": "",
+                "CXX_FLAGS": ""
+            },
+            'asm-compiler': {
+                "ASM_FLAGS": ""
+            },
+            linker: {
+                "output-format": "elf",
+                "remove-unused-input-sections": true,
+                "LD_FLAGS": "",
+                "LIB_FLAGS": "-lc_nano -lm_nano -lnosys"
             }
         };
     }

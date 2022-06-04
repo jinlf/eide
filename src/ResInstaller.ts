@@ -85,6 +85,12 @@ export class ResInstaller {
             no_binaries: no_binaries
         });
 
+        this.registerTool('MM32CC', {
+            setting_name: 'MM.MM32CC.InstallDirectory',
+            resource_name: 'mm32cc',
+            no_binaries: no_binaries
+        });
+
         this.registerTool('RISCV_GCC', {
             setting_name: 'RISCV.InstallDirectory',
             resource_name: 'gcc_riscv',

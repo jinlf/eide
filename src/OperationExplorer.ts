@@ -237,7 +237,7 @@ export class OperationExplorer {
             }
         });
 
-        const tcList: ToolchainName[] = ['AC5', 'GCC', 'IAR_STM8', 'SDCC', 'Keil_C51', 'RISCV_GCC', 'ANY_GCC', 'GNU_SDCC_STM8'];
+        const tcList: ToolchainName[] = ['AC5', 'GCC', 'MM32CC', 'IAR_STM8', 'SDCC', 'Keil_C51', 'RISCV_GCC', 'ANY_GCC', 'GNU_SDCC_STM8'];
         const toolchainManager = ToolchainManager.getInstance();
         const checkResults = tcList.map((tcName) => { return toolchainManager.isToolchainPathReady(tcName); });
         const status: CheckStatus = checkResults.every((val) => { return val; }) ?
@@ -573,6 +573,12 @@ export class OperationExplorer {
                 type: 'GCC',
                 description: this.getStatusTxt(toolchainManager.isToolchainPathReady('GCC')),
                 detail: view_str$operation$setToolchainInstallDir.replace('${name}', 'GNU Arm Embedded Toolchain')
+            },
+            {
+                label: 'MM32CC Arm Embedded Toolchain',
+                type: 'MM32CC',
+                description: this.getStatusTxt(toolchainManager.isToolchainPathReady('MM32CC')),
+                detail: view_str$operation$setToolchainInstallDir.replace('${name}', 'MM32CC Embedded Toolchain')
             },
             {
                 label: 'IAR For STM8 (iccstm8)',

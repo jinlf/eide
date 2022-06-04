@@ -476,6 +476,10 @@ export abstract class CodeBuilder {
             builderOptions.buildMode = builderModeList.map(str => str.toLowerCase()).join('|');
         }
 
+        if (config.toolchain === 'MM32CC') {
+            builderOptions.toolchainCfgFile = ResManager.GetInstance().GetAppDataDir().path.concat( File.sep, 'mm.mm32cc.model.json');
+        }
+
         // write project build params
         fs.writeFileSync(paramsPath, JSON.stringify(builderOptions, undefined, 4));
 
@@ -883,6 +887,10 @@ export class ARMCodeBuilder extends CodeBuilder {
         options.global['microcontroller-float'] = cpuString;
         options.global['target'] = cpuString; // params for 'armclang-asm'
 
+        if (['MM32CC'].includes(config.toolchain)) {
+            options.global['$linker-config'] = cpuString;
+        }
+        
         if (!options['linker']) {
             options.linker = Object.create(null);
         }

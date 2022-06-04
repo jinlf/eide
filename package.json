@@ -407,6 +407,12 @@
                         "markdownDescription": "%settings.arm.gcc.install.folder%",
                         "default": "${userRoot}/.eide/tools/gcc_arm"
                     },
+                    "EIDE.MM.MM32CC.InstallDirectory": {
+                        "type": "string",
+                        "scope": "resource",
+                        "markdownDescription": "%settings.mm.mm32cc.install.folder%",
+                        "default": "${userRoot}/.eide/tools/mm32cc"
+                    },
                     "EIDE.ARM.INI.Path": {
                         "type": "string",
                         "scope": "machine",

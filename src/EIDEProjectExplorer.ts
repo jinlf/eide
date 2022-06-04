@@ -2496,7 +2496,7 @@ export class ProjectExplorer implements CustomConfigurationProvider {
     ExportKeilXml(prjIndex: number) {
         try {
             const prj = this.dataProvider.GetProjectByIndex(prjIndex);
-            const matchList: ToolchainName[] = ['AC5', 'AC6', 'GCC', 'Keil_C51'];
+            const matchList: ToolchainName[] = ['AC5', 'AC6', 'GCC', 'MM32CC', 'Keil_C51'];
 
             // limit toolchain
             if (!matchList.includes(prj.getToolchain().name)) {
@@ -3523,6 +3523,9 @@ export class ProjectExplorer implements CustomConfigurationProvider {
             switch (toolchain.name) {
                 case 'GCC':
                     cfgList.push('armgcc');
+                    break;
+                case 'MM32CC':
+                    cfgList.push('mm32cc');
                     break;
                 case 'RISCV_GCC':
                     cfgList.push('riscv');

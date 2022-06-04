@@ -1578,6 +1578,8 @@ export abstract class CompileConfigModel<T> extends ConfigModel<T> {
                 return <any>new Armcc6CompileConfigModel(prjConfigData);
             case 'GCC':
                 return <any>new GccCompileConfigModel(prjConfigData);
+            case 'MM32CC':
+                return <any>new Mm32ccCompileConfigModel(prjConfigData);
             case 'RISCV_GCC':
                 return <any>new RiscvCompileConfigModel(prjConfigData);
             case 'ANY_GCC':
@@ -2047,6 +2049,19 @@ class Armcc6CompileConfigModel extends ArmBaseCompileConfigModel {
 }
 
 class GccCompileConfigModel extends ArmBaseCompileConfigModel {
+
+    protected cpuTypeList = [
+        'Cortex-M0',
+        'Cortex-M0+',
+        'Cortex-M23',
+        'Cortex-M3',
+        'Cortex-M33',
+        'Cortex-M4',
+        'Cortex-M7'
+    ];
+}
+
+class Mm32ccCompileConfigModel extends ArmBaseCompileConfigModel {
 
     protected cpuTypeList = [
         'Cortex-M0',

@@ -427,6 +427,11 @@ export class SettingManager {
         return new File(this.getGccFolderFromConfig('ARM.GCC.InstallDirectory', execName) || 'null');
     }
 
+    getMM32CCDir(): File {
+        const execName = `mm32cc`;
+        return new File(this.getGccFolderFromConfig('MM.MM32CC.InstallDirectory', execName) || 'null');
+    }
+
     // ---
 
     getArmcc5Dir(): File {

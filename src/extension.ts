@@ -684,6 +684,7 @@ function exportEnvToSysPath() {
     // export some tools path to system env path
     const pathList: { key: string, path: string }[] = [
         { key: 'EIDE_ARM_GCC', path: `${settingManager.getGCCDir().path}${File.sep}bin` },
+        { key: 'EIDE_MM_MM32CC', path: `${settingManager.getMM32CCDir().path}${File.sep}bin` },
         { key: 'EIDE_JLINK', path: `${settingManager.getJlinkDir()}` },
         { key: 'EIDE_OPENOCD', path: `${NodePath.dirname(settingManager.getOpenOCDExePath())}` },
         { key: 'EIDE_TOOLS_DIR', path: exToolsRoot }
@@ -971,6 +972,7 @@ async function InitComponents(context: vscode.ExtensionContext): Promise<boolean
         /* set some toolpath to env when path is changed */
 
         if (e.affectsConfiguration('EIDE.ARM.GCC.InstallDirectory') ||
+            e.affectsConfiguration('EIDE.MM.MM32CC.InstallDirectory') ||
             e.affectsConfiguration('EIDE.JLink.InstallDirectory') ||
             e.affectsConfiguration('EIDE.OpenOCD.ExePath')) {
             exportEnvToSysPath();
@@ -1206,6 +1208,9 @@ class MapViewEditorProvider implements vscode.CustomTextEditorProvider {
                 break;
             case 'GCC':
                 toolName = 'GCC_ARM';
+                break;
+            case 'MM32CC':
+                toolName = 'MM32CC';
                 break;
             default:
                 webviewPanel.webview.html = this.genHtmlCont(title, `<span class="error">Error</span>: We not support this toolchain type: '${conf.tool}' !`);

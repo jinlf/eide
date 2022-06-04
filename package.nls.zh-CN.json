@@ -112,6 +112,8 @@
     "settings.arm.gcc.install.folder": "GNU Arm Embedded Toolchain 安装目录 [`example: D:\\arm-gcc\\8 2019-q3-update`]",
     "settings.arm.gcc.prefix": "GNU Arm Embedded Toolchain 编译器前缀 [`example: arm-none-eabi-`]",
 
+    "settings.mm.mm32cc.install.folder": "MM32CC Arm Embedded Toolchain 安装目录 [`example: D:\\mm32cc\\13.0.0`]",
+
     "settings.armcc.ini": "Keil ARM MDK `TOOLS.INI` 文件路径 [`example: C:\\Keil_v5\\TOOLS.INI`]",
     "settings.armcc.convert.axf": "编译完成后将 `.axf` 转换为 `.elf`",
     
