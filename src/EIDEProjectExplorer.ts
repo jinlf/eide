@@ -1979,7 +1979,7 @@ export class ProjectExplorer implements CustomConfigurationProvider {
 
     name: string = 'eide';
 
-    extensionId: string = 'cl.eide';
+    extensionId: string = 'cl.eide-mm';
 
     private isRegisteredCpptoolsProvider: boolean = false;
 

@@ -279,7 +279,7 @@ export class ResInstaller {
                 .showWarningMessage(msg, txt_jump2settings)
                 .then((item) => {
                     if (item) {
-                        SettingManager.jumpToSettings(setting_name || '@ext:cl.eide');
+                        SettingManager.jumpToSettings(setting_name || '@ext:cl.eide-mm');
                     }
                 });
             return false;
@@ -299,7 +299,7 @@ export class ResInstaller {
         if (!item) { return false; } // user canceled, exit
 
         if (item == txt_jump2settings) { // user select set it, jump to setting
-            SettingManager.jumpToSettings(`${SettingManager.TAG}.${toolInfo.setting_name}` || '@ext:cl.eide');
+            SettingManager.jumpToSettings(`${SettingManager.TAG}.${toolInfo.setting_name}` || '@ext:cl.eide-mm');
             return false;
         }
 

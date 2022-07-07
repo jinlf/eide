@@ -720,7 +720,7 @@ export abstract class AbstractProject implements CustomConfigurationProvider {
     ////////////////////////////////// cpptools provider interface ///////////////////////////////////
 
     name: string = 'eide';
-    extensionId: string = 'cl.eide';
+    extensionId: string = 'cl.eide-mm';
     abstract canProvideConfiguration(uri: vscode.Uri, token?: vscode.CancellationToken | undefined): Thenable<boolean>;
     abstract provideConfigurations(uris: vscode.Uri[], token?: vscode.CancellationToken | undefined): Thenable<SourceFileConfigurationItem[]>;
     abstract canProvideBrowseConfiguration(token?: vscode.CancellationToken | undefined): Thenable<boolean>;
@@ -2503,7 +2503,7 @@ class EIDEProject extends AbstractProject {
             // add extension recommendation
             {
                 let recommendExt: string[] = [
-                    "cl.eide",
+                    "cl.eide-mm",
                     "keroc.hex-fmt",
                     "xiaoyongdong.srecord",
                     "hars.cppsnippets",
@@ -2620,7 +2620,7 @@ class EIDEProject extends AbstractProject {
     ////////////////////////////////// cpptools intellisence provider ///////////////////////////////////
 
     name: string = 'eide';
-    extensionId: string = 'cl.eide';
+    extensionId: string = 'cl.eide-mm';
 
     // virtual source path list (!! must be real absolute path !!)
     //      key: fsPath

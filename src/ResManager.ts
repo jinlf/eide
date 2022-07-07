@@ -68,7 +68,7 @@ const eideBinDirList: string[] = [
 
 const codePage = GetLocalCodePage();
 const cacheName = 'eide.cache';
-const appName = 'cl.eide';
+const appName = 'cl.eide-mm';
 
 export interface FileCacheInfo {
     name: string;
