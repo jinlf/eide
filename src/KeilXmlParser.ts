@@ -49,6 +49,7 @@ export interface KeilParserResult<CompileOption> {
     name: string;
     type: ProjectType;
     device: string;
+    vendor: string;
     incList: string[];
     defineList: string[];
     fileGroups: FileGroup[];
@@ -825,6 +826,8 @@ class ARMParser extends KeilParser<KeilARMOption> {
             obj.type = this.TYPE_TAG;
 
             obj.device = target.TargetOption.TargetCommonOption.Device;
+
+            obj.vendor = target.TargetOption.TargetCommonOption.Vendor;
 
             obj.incList = this.SplitPathSeparator(
                 target.TargetOption.TargetArmAds.Cads.VariousControls.IncludePath, new RegExp(File.delimiter + '\\s*'))

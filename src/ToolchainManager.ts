@@ -377,7 +377,7 @@ export class ToolchainManager {
             case 'GCC':
                 return File.fromArray([settingManager.getGCCDir().path, 'bin']);
             case 'MM32CC':
-                return File.fromArray([settingManager.getMM32CCDir().path, 'bin']);    
+                return File.fromArray([settingManager.getMM32CCDir().path, 'bin']);
             case 'IAR_STM8':
                 return File.fromArray([settingManager.getIARForStm8Dir().path, 'stm8', 'bin']);
             case 'SDCC':
@@ -1853,8 +1853,8 @@ class MM32CC implements IToolchian {
                 "warnings": "all-warnings",
                 "one-elf-section-per-function": true,
                 "one-elf-section-per-data": true,
-                "C_FLAGS": "",
-                "CXX_FLAGS": ""
+                "C_FLAGS": "-Ofast",
+                "CXX_FLAGS": "-Ofast"
             },
             'asm-compiler': {
                 "ASM_FLAGS": ""
@@ -1863,7 +1863,7 @@ class MM32CC implements IToolchian {
                 "output-format": "elf",
                 "remove-unused-input-sections": true,
                 "LD_FLAGS": "",
-                "LIB_FLAGS": "-lc_nano -lm_nano -lnosys"
+                "LIB_FLAGS": "-lc -lm -lnosys"
             }
         };
     }

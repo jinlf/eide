@@ -463,7 +463,7 @@ export class ResManager extends events.EventEmitter {
                 const jlinkDevList: any[] = dom.DataBase.Device;
                 for (const device of jlinkDevList) {
                     if (device.ChipInfo) {
-                        const mcuInf = { vendor: device.ChipInfo.$Vendor, cpuName: device.ChipInfo.$Name };
+                        const mcuInf = { vendor: device.ChipInfo.$Vendor, cpuName: device.ChipInfo.$Name, core: device.ChipInfo.$Core };
                         if (this.devList.findIndex((item => item.vendor == mcuInf.vendor && item.cpuName == mcuInf.cpuName)) != -1) continue;
                         this.devList.push(mcuInf);
                     }
@@ -544,6 +544,7 @@ export class ResManager extends events.EventEmitter {
                                 this.devList.push({
                                     vendor: vendorInfo.$Name,
                                     cpuName: device.$Name,
+                                    core: device.$Core,
                                 });
                             }
                         });

@@ -88,6 +88,7 @@ export class SettingManager {
         /* add env */
         this.eideEnv.set('${eideRoot}', context.extensionPath);
         this.eideEnv.set('${userRoot}', os.homedir());
+        this.eideEnv.set("${execPath}", process.execPath);
 
         this.refreshMDKStatus();
         this.refreshC51Status();

@@ -37,6 +37,7 @@ import {
     view_str$operation$create_from_internal_temp,
     view_str$operation$empty_8bit_prj,
     view_str$operation$empty_cortex_prj,
+    view_str$operation$empty_mindmotion_prj,
     import_project_hit, view_str$import_project, view_str$operation$import_sel_out_folder, view_str$operation$empty_riscv_prj,
     view_str$operation$create_from_remote_repo, view_str$operation$create_from_local_disk, view_str$operation$create_empty_project_detail,
     view_str$operation$create_from_internal_temp_detail, view_str$operation$create_from_local_disk_detail,
@@ -60,6 +61,7 @@ import * as vscode from 'vscode';
 import * as NodePath from 'path';
 import { ResInstaller } from './ResInstaller';
 import { AbstractProject } from './EIDEProject';
+import {CompileConfigPickItem} from './EIDETypeDefine';
 
 interface TemplatePickItem extends vscode.QuickPickItem, TemplateInfo {
     cacheFileName: string | undefined;
@@ -342,6 +344,11 @@ export class OperationExplorer {
                             type: 'ARM'
                         },
                         {
+                            label: view_str$operation$empty_mindmotion_prj,
+                            detail: 'for MindMotion chips',
+                            type: 'MM'
+                        },
+                        {
                             label: view_str$operation$empty_riscv_prj,
                             detail: 'for risc-v chips',
                             type: 'RISC-V'
@@ -475,10 +482,28 @@ export class OperationExplorer {
 
         } else { // create empty project
 
+            const devList = ResManager.GetInstance().getJLinkDevList().map<CompileConfigPickItem>((info) => {
+                return {
+                    label: info.cpuName,
+                    description: info.vendor,
+                    val: info
+                };
+            });            
+            const dev = await vscode.window.showQuickPick<CompileConfigPickItem>(devList, {                        
+                canPickMany: false,
+                matchOnDescription: true,
+                placeHolder: `found ${devList.length} results`
+            });
+            let device = undefined;
+            if (dev !== undefined) {
+                device = dev.val;
+            }
+
             this.emit('request_create_project', {
                 type: templateItem.type,
                 name: name,
-                outDir: new File(outDir[0].fsPath)
+                outDir: new File(outDir[0].fsPath),
+                device: device,
             });
         }
     }

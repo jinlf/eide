@@ -686,6 +686,11 @@ export const view_str$operation$empty_cortex_prj = [
     'Cortex-M Project'
 ][langIndex];
 
+export const view_str$operation$empty_mindmotion_prj = [
+    'MindMotion 项目',
+    'MindMotion Project'
+][langIndex];
+
 export const view_str$operation$empty_riscv_prj = [
     'RISC-V 项目',
     'RISC-V Project'

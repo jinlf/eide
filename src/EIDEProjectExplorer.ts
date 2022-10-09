@@ -68,7 +68,7 @@ import {
 import { CodeBuilder, BuildOptions } from './CodeBuilder';
 import { ExceptionToMessage, newMessage } from './Message';
 import { SettingManager } from './SettingManager';
-import { HexUploaderManager, HexUploaderType } from './HexUploader';
+import { CPUInfo, HexUploaderManager, HexUploaderType } from './HexUploader';
 import { Compress, CompressOption } from './Compress';
 import { DependenceManager } from './DependenceManager';
 import { ArrayDelRepetition } from '../lib/node-utility/Utility';
@@ -1581,6 +1581,9 @@ class ProjectDataProvider implements vscode.TreeDataProvider<ProjTreeItem> {
                 newTarget.uploader = projectInfo.uploader;
                 newTarget.uploadConfig = copyObject(projectInfo.uploadConfig);
                 newTarget.uploadConfigMap = copyObject(projectInfo.uploadConfigMap);
+                //get device
+                newTarget.device = keilTarget.device;
+                newTarget.vendor = keilTarget.vendor;
 
                 // set specific configs
                 if (keilTarget.type === 'C51') { // C51 project
@@ -1598,6 +1601,13 @@ class ProjectDataProvider implements vscode.TreeDataProvider<ProjTreeItem> {
                 else {
                     const keilCompileConf = <KeilARMOption>keilTarget.compileOption;
                     const prjCompileOption = (<ArmBaseCompileData>newTarget.compileConfig);
+                    // set device
+                    if (newTarget.uploader == 'JLink') {
+                        let cpuInfo = ResManager.GetInstance().getJLinkDevByFullName(keilTarget.device);
+                        if (cpuInfo !== undefined) {
+                            newTarget.uploadConfig.cpuInfo = cpuInfo;
+                        }
+                    }
                     // set toolchain
                     newTarget.toolchain = keilCompileConf.toolchain;
                     // set cpu type

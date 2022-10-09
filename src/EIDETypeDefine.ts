@@ -1,25 +1,25 @@
 /*
-	MIT License
+    MIT License
 
-	Copyright (c) 2019 github0null
+    Copyright (c) 2019 github0null
 
-	Permission is hereby granted, free of charge, to any person obtaining a copy
-	of this software and associated documentation files (the "Software"), to deal
-	in the Software without restriction, including without limitation the rights
-	to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-	copies of the Software, and to permit persons to whom the Software is
-	furnished to do so, subject to the following conditions:
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
 
-	The above copyright notice and this permission notice shall be included in all
-	copies or substantial portions of the Software.
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
 
-	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-	IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-	FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-	AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-	LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-	SOFTWARE.
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.
 */
 
 import * as events from 'events';
@@ -62,7 +62,7 @@ import { ArrayDelRepetition } from "../lib/node-utility/Utility";
 import { GlobalEvent } from "./GlobalEvents";
 import { ExceptionToMessage, newMessage } from "./Message";
 import { ToolchainName, IToolchian, ToolchainManager } from './ToolchainManager';
-import { HexUploaderType, STLinkOptions, STVPFlasherOptions, StcgalFlashOption, JLinkOptions, ProtocolType, PyOCDFlashOptions, OpenOCDFlashOptions, STLinkProtocolType, CustomFlashOptions } from "./HexUploader";
+import { HexUploaderType, STLinkOptions, STVPFlasherOptions, StcgalFlashOption, JLinkOptions, ProtocolType, PyOCDFlashOptions, OpenOCDFlashOptions, STLinkProtocolType, CustomFlashOptions, CPUInfo } from "./HexUploader";
 import { AbstractProject, VirtualSource } from "./EIDEProject";
 import { SettingManager } from "./SettingManager";
 import { WorkspaceManager } from "./WorkspaceManager";
@@ -98,16 +98,18 @@ export interface ProjectFileGroup extends FileGroup {
 //
 //  'C51': 8BIT MCU Project (like: mcs51, stm8, ...)
 //  'ARM': Cortex-M Project
+//  'MM': MindMotion Project
 //  'RISC-V': RISCV Project
 //  'ANY-GCC': Any GCC Toolchain Project
 //
-export type ProjectType = 'C51' | 'ARM' | 'RISC-V' | 'ANY-GCC';
+export type ProjectType = 'C51' | 'ARM' | 'MM' | 'RISC-V' | 'ANY-GCC';
 
 export interface CreateOptions {
     name: string; // folder name
     outDir: File;
     templateFile?: File;
     type: ProjectType;
+    device?: CPUInfo;
 }
 
 export interface ImportOptions {
@@ -437,6 +439,8 @@ export interface ProjectTargetInfo {
     uploadConfig: any | null;
     uploadConfigMap: { [uploader: string]: any };
     custom_dep: Dependence;
+    device: string;
+    vendor: string;
 }
 
 export interface VirtualFile {
@@ -496,6 +500,7 @@ interface ProjectConfigApi {
     toRelativePath: (path: string) => string;
 }
 
+
 export class ProjectConfiguration<T extends BuilderConfigData>
     extends Configuration<ProjectConfigData<T>, ProjectConfigEvent> {
 
@@ -509,7 +514,7 @@ export class ProjectConfiguration<T extends BuilderConfigData>
     private rootDir: File | undefined;
     private api: ProjectConfigApi;
 
-    constructor(f: File, type?: ProjectType) {
+    constructor(f: File, type?: ProjectType, device?: CPUInfo) {
 
         super(f, type);
 
@@ -541,6 +546,194 @@ export class ProjectConfiguration<T extends BuilderConfigData>
 
         // update upload model
         this.compileConfigModel.on('dataChanged', () => this.uploadConfigModel.emit('NotifyUpdate', this));
+
+        if (device !== undefined) {
+            if (this.config.toolchain == 'MM32CC') {
+                let model = <Mm32ccCompileConfigModel>this.compileConfigModel;
+                if (model !== undefined) {
+                    let linkerScript = this.GetMM32CCLinkerScriptFromPack(device.cpuName, device.vendor);
+                    if (linkerScript !== undefined) {
+                        model.data.scatterFilePath = linkerScript;
+                    }
+                }
+                if (device.vendor === 'MindMotion') {
+                    let customDep = this.CustomDep_getDependence();
+                    let cpuCore = this.GetCPUCoreFromDevice(device);
+                    if (cpuCore !== undefined) {
+                        let path = undefined;
+                        let mm32cc_path = ToolchainManager.getInstance().getToolchainExecutableFolder('MM32CC');
+                        if (mm32cc_path !== undefined && mm32cc_path.IsExist()) {
+                            switch (cpuCore) {
+                                case 'Cortex-M0':
+                                    path = `${mm32cc_path?.path}/../lib/clang-runtimes/armv6m_soft_nofp/include`;
+                                    break;
+                                case 'Cortex-M3':
+                                    path = `${mm32cc_path?.path}/../lib/clang-runtimes/armv7m_soft_nofp/include`;
+                                    break;
+                            }
+                            if (path !== undefined) {
+                                customDep.incList.push(this.toRelativePath(path));
+                            }
+                        }
+                    }
+                    if (this.DeviceHasFPU(device)) {
+                        if (customDep.defineList.findIndex((value, index, obj) => value.startsWith("___FPU_PRESENT")) === -1) {
+                            customDep.defineList.push("___FPU_PRESENT=1U");
+                            customDep.defineList.push("USE_HAL_DRIVER");
+                        }
+                    } else {
+                        if (customDep.defineList.findIndex((value, index, obj) => value == "__SOFTFP__") === -1) {
+                            customDep.defineList.push("__SOFTFP__");
+                            customDep.defineList.push("USE_HAL_DRIVER");
+                        }
+                    }
+                }
+            }
+            if (this.uploadConfigModel.uploader === 'JLink') {
+                let model = <JLinkUploadModel>this.uploadConfigModel;
+                if (model !== undefined) {
+                    model.data.cpuInfo = device;
+                }
+            }
+            /*
+            if (this.uploadConfigModel.uploader === 'OpenOCD') {
+                let model = <OpenOCDUploadModel>this.uploadConfigModel;
+                if (model !== undefined) {
+                    let target = model.GetTargetByName(device.cpuName);
+                    if (target !== undefined) {
+                        model.data.target = target;
+                    }
+                    model.data.interface = "cmsis-dap";
+                }
+            }
+            */
+        }
+    }
+    DeviceHasFPU(device: CPUInfo): Boolean {
+        return false;
+    }
+    GetCPUCoreFromDevice(device: CPUInfo): string | undefined {
+        return device.core;
+    }
+
+
+    public GetMM32CCLinkerScriptFromPack<T>(device: string, vendor: string): string | undefined {
+        if (vendor === 'STMicroelectronics') {
+            vendor = 'ST';
+        }
+        let vendor_folder_path = `${process.execPath}/../data/Packs/${vendor}`;
+        let vendor_folder = new File(vendor_folder_path);
+        if (!vendor_folder.IsDir()) {
+            return undefined;
+        }
+        let dfp_folder_name = this.GetDFPFolder(vendor_folder, device);
+        if (dfp_folder_name === undefined) {
+            return undefined;
+        }
+        let dfp_folder_path = `${vendor_folder_path}/${dfp_folder_name}`
+        let dfp_folder = new File(dfp_folder_path);
+        if (!dfp_folder.IsDir()) {
+            return undefined;
+        }
+        let version = this.GetPackVersion(dfp_folder);
+        if (version === undefined) {
+            return undefined;
+        }
+        let linker_folder_path = `${dfp_folder_path}/${version}/device/armgcc/linker`;
+        let linker_folder = new File(linker_folder_path);
+        if (!linker_folder.IsDir()) {
+            return undefined;
+        }
+        let linker_script = this.GetLinkerScript(linker_folder);
+        if (linker_script === undefined) {
+            return undefined;
+        }
+
+        return `${linker_folder_path}/${linker_script}`;
+    }
+
+    longestCommonPrefix(strs: string[]): string {
+        let i = 0;
+
+        if (!strs.length) {
+            return "";
+        }
+
+        while (true) {
+            const char = strs[0][i] || "";
+            const match = strs.every(str => str[i] === char);
+            if (match) {
+                i += 1;
+            } else {
+                break;
+            }
+        }
+        return strs[0].slice(0, i);
+    };
+
+    GetDFPFolder(vendor_folder: File, device: string): string | undefined {
+        let folders = vendor_folder.GetAll(File.EMPTY_FILTER, [/_DFP$/]);
+        if (folders.length === 0) {
+            return undefined
+        }
+        let ret = folders.map<{ prefix: string, value: File }>((value, index, array) => { return { prefix: this.longestCommonPrefix([value.name, device]), value: value } }).sort((a, b) => b.prefix.length - a.prefix.length);
+        return ret[0].value.name;
+    }
+    GetLinkerScript(linker_folder: File): string | undefined {
+        let files = linker_folder.GetAll([/\.ld$/], File.EMPTY_FILTER);
+        if (files.length == 0) {
+            return undefined;
+        }
+        return files[0].name;
+    }
+    GetPackVersion(dfp_folder: File): string | undefined {
+        let dirs = dfp_folder.GetAll(File.EMPTY_FILTER, [/[0-9]+\.[0-9]+\.[0-9]+/]);
+        if (dirs.length == 0) {
+            return undefined;
+        }
+        let dir = dirs.sort((a, b) => parseInt(b.name.split(".")[0]) - parseInt(a.name.split(".")[0]))[0];
+        return dir.name;
+    }
+    GetMM32CCStartupFromPack(device: string, vendor: string): string | undefined {
+        if (vendor === 'STMicroelectronics') {
+            vendor = 'ST';
+        }
+        let vendor_folder_path = `${process.execPath}/../data/Packs/${vendor}`;
+        let vendor_folder = new File(vendor_folder_path);
+        if (!vendor_folder.IsDir()) {
+            return undefined;
+        }
+        let dfp_folder_name = this.GetDFPFolder(vendor_folder, device);
+        if (dfp_folder_name === undefined) {
+            return undefined;
+        }
+        let dfp_folder_path = `${vendor_folder_path}/${dfp_folder_name}`
+        let dfp_folder = new File(dfp_folder_path);
+        if (!dfp_folder.IsDir()) {
+            return undefined;
+        }
+        let version = this.GetPackVersion(dfp_folder);
+        if (version === undefined) {
+            return undefined;
+        }
+        let armgcc_folder_path = `${dfp_folder_path}/${version}/device/armgcc`;
+        let armgcc_folder = new File(armgcc_folder_path);
+        if (!armgcc_folder.IsDir()) {
+            return undefined;
+        }
+        let startup = this.GetStartup(armgcc_folder);
+        if (startup == undefined) {
+            return undefined;
+        }
+
+        return `${armgcc_folder_path}/${startup}`;
+    }
+    GetStartup(armgcc_folder: File): string | undefined {
+        let files = armgcc_folder.GetAll([/\.[s|S]$/], File.EMPTY_FILTER);
+        if (files.length == 0) {
+            return undefined;
+        }
+        return files[0].name;
     }
 
     protected Init(f: File) {
@@ -554,13 +747,13 @@ export class ProjectConfiguration<T extends BuilderConfigData>
         return <File>this.rootDir;
     }
 
-    private toAbsolutePath(path: string): string {
+    toAbsolutePath(path: string): string {
         const _path = path.trim();
         if (File.isAbsolute(_path)) { return _path; }
         return NodePath.normalize(File.ToLocalPath(this.getRootDir().path + File.sep + _path));
     }
 
-    private toRelativePath(_path: string): string {
+    public toRelativePath(_path: string): string {
 
         const path = File.ToUnixPath(_path);
 
@@ -661,6 +854,27 @@ export class ProjectConfiguration<T extends BuilderConfigData>
                     targets: {},
                     version: EIDE_CONF_VERSION
                 };
+            case 'MM':
+                return {
+                    name: 'undefined',
+                    type: 'ARM',
+                    mode: 'Debug',
+                    toolchain: 'MM32CC',
+                    dependenceList: [],
+                    compileConfig: GccCompileConfigModel.getDefaultConfig(),
+                    uploader: 'JLink',
+                    srcDirs: [],
+                    virtualFolder: { name: VirtualSource.rootName, files: [], folders: [] },
+                    excludeList: [],
+                    outDir: 'build',
+                    deviceName: null,
+                    packDir: null,
+                    uploadConfig: null,
+                    uploadConfigMap: {},
+                    miscInfo: <any>{},
+                    targets: {},
+                    version: EIDE_CONF_VERSION
+                };
             case 'RISC-V':
                 return {
                     name: 'undefined',
@@ -726,6 +940,22 @@ export class ProjectConfiguration<T extends BuilderConfigData>
         this.config.uploader = uploader;
         this.uploadConfigModel.data = utility.copyObject(oldCfg) || this.uploadConfigModel.data;
         this.config.uploadConfig = this.uploadConfigModel.data; // bind obj
+
+        /*
+        if (uploader === 'OpenOCD' && oldCfg === undefined) {
+            let device = this.config.targets[this.config.mode].device;
+            if (device !== undefined) {
+                let model = <OpenOCDUploadModel>this.uploadConfigModel;
+                if (model !== undefined) {
+                    let targetConfig = model.GetTargetByName(device);
+                    if (targetConfig !== undefined) {
+                        model.data.target = targetConfig;
+                    }
+                    model.data.interface = "cmsis-dap";
+                }
+            }
+        }
+        */
 
         // update listeners
         this.uploadConfigModel.copyListenerFrom(oldModel);
@@ -1311,7 +1541,7 @@ type FieldType = 'INPUT' | 'INPUT_INTEGER' | 'SELECTION' | 'OPEN_FILE' | 'EVENT'
 */
 type OpenFileFilter = { [name: string]: string[] };
 
-interface CompileConfigPickItem extends vscode.QuickPickItem {
+export interface CompileConfigPickItem extends vscode.QuickPickItem {
     val?: any;
 }
 
@@ -3457,6 +3687,24 @@ class OpenOCDUploadModel extends UploadConfigModel<OpenOCDFlashOptions> {
             interface: 'stlink',
             baseAddr: '0x08000000'
         };
+    }
+
+    public GetTargetByName(fullName: string): string | undefined {
+        let configList = this.getConfigList('target');
+        if (configList === undefined) {
+            return undefined;
+        }
+        const devIndex = configList.findIndex((dev) => {
+            let name = dev.name;
+            if (name.endsWith("x")) {
+                name = name.substring(0, name.length - 1);
+            }
+            return fullName.toLowerCase().startsWith(name);
+        });
+        if (devIndex !== -1) {
+            return configList[devIndex].name;
+        }
+        return undefined;
     }
 }
 

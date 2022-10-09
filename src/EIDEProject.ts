@@ -36,14 +36,14 @@ import {
 
 import { File } from '../lib/node-utility/File';
 import { FileWatcher } from '../lib/node-utility/FileWatcher';
-import { KeilParser } from './KeilXmlParser';
+import { KeilParser, KeilParserResult } from './KeilXmlParser';
 import { ResManager } from './ResManager';
 import { Compress } from './Compress';
 import {
     CurrentDevice, ConfigMap, FileGroup,
     ProjectConfiguration, ProjectConfigData, WorkspaceConfiguration,
     CreateOptions,
-    ProjectConfigEvent, ProjectFileGroup, EventData, FileItem, EIDE_CONF_VERSION, ProjectTargetInfo, VirtualFolder, VirtualFile, CompileConfigModel, ArmBaseCompileData, ArmBaseCompileConfigModel, Dependence, CppConfigItem, ICompileOptions
+    ProjectConfigEvent, ProjectFileGroup, EventData, FileItem, EIDE_CONF_VERSION, ProjectTargetInfo, VirtualFolder, VirtualFile, CompileConfigModel, ArmBaseCompileData, ArmBaseCompileConfigModel, Dependence, CppConfigItem, ICompileOptions, ArmBaseBuilderConfigData
 } from './EIDETypeDefine';
 import { ToolchainName, IToolchian, ToolchainManager } from './ToolchainManager';
 import { GlobalEvent } from './GlobalEvents';
@@ -1176,7 +1176,9 @@ export abstract class AbstractProject implements CustomConfigurationProvider {
             uploader: target.uploader,
             uploadConfig: uploadConfig_,
             uploadConfigMap: uploadConfigMap_,
-            custom_dep: custom_dep
+            custom_dep: custom_dep,
+            device: target.targets[target.mode].device,
+            vendor: target.targets[target.mode].vendor,
         };
     }
 
@@ -1284,9 +1286,144 @@ export abstract class AbstractProject implements CustomConfigurationProvider {
 
     setToolchain(name: ToolchainName, notReload?: boolean) {
         const prjConfig = this.GetConfiguration();
+
+        let oldToolchain = prjConfig.config.toolchain;
+
         prjConfig.setToolchain(name);
+
+        // set linker script for MM32CC
+        if (name == 'MM32CC' && (oldToolchain === 'AC5' || oldToolchain === 'AC6')) {
+            let compileConfig = <ArmBaseCompileData>prjConfig.config.compileConfig;
+            if (compileConfig !== undefined && compileConfig.scatterFilePath === 'undefined') {
+                let keilStartup = this.GetKeilStartup(prjConfig);
+                if (keilStartup !== undefined) {
+                    this.DisableFile(keilStartup);
+                }
+
+                let keilTarget = prjConfig.config.targets[prjConfig.config.mode];
+                if (keilTarget !== undefined) {
+                    let device = keilTarget.device;
+                    let vendor = keilTarget.vendor;
+
+                    let mm32ccStartup = this.GetMM32CCStartup(prjConfig);
+                    if (mm32ccStartup === undefined) {
+                        let startup = prjConfig.GetMM32CCStartupFromPack(device, vendor);
+                        if (startup !== undefined) {
+                            mm32ccStartup = this.AddFile(startup);
+                            if (mm32ccStartup !== undefined) {
+                                this.EnableFile(mm32ccStartup);
+                            }
+                        }
+                    } else {
+                        this.EnableFile(mm32ccStartup);
+                    }
+
+                    let linkerScript = prjConfig.GetMM32CCLinkerScriptFromPack(device, vendor);
+                    if (linkerScript !== undefined) {
+                        compileConfig.scatterFilePath = linkerScript;
+                    }
+
+                    this.AddMM32CCInclude(device, vendor);
+                    prjConfig.CustomDep_AddDefine("__SOFTFP__");
+                }
+            }
+        } else if ((name === 'AC6' || name === 'AC5') && oldToolchain === 'MM32CC') {
+            let keilStartup = this.GetKeilStartup(prjConfig);
+            if (keilStartup !== undefined) {
+                this.EnableFile(keilStartup);
+            }
+
+            let mm32ccStartup = this.GetMM32CCStartup(prjConfig);
+            if (mm32ccStartup !== undefined) {
+                this.DisableFile(mm32ccStartup);
+            }
+
+            this.RemoveMM32CCInclude();
+        }
+
         if (!notReload) this.reloadToolchain();
     }
+    AddMM32CCInclude(cpuName: string, vendor: string) {
+        if (vendor === 'MindMotion') {
+            const prjConfig = this.GetConfiguration();
+            let device = ResManager.GetInstance().getJLinkDevList().find((value, index, obj) => value.cpuName.startsWith(cpuName));
+            if (device === undefined) {
+                return;
+            }
+            let cpuCore = device?.core;
+            if (cpuCore !== undefined) {
+                let path = undefined;
+                let mm32cc_path = ToolchainManager.getInstance().getToolchainExecutableFolder('MM32CC');
+                if (mm32cc_path !== undefined && mm32cc_path.IsExist()) {
+                    switch (cpuCore) {
+                        case 'Cortex-M0':
+                            path = `${mm32cc_path?.path}/../lib/clang-runtimes/armv6m_soft_nofp/include`;
+                            path = prjConfig.toAbsolutePath(prjConfig.toRelativePath(path));
+                            break;
+                        case 'Cortex-M3':
+                            path = `${mm32cc_path?.path}/../lib/clang-runtimes/armv7m_soft_nofp/include`;
+                            path = prjConfig.toAbsolutePath(prjConfig.toRelativePath(path));
+                            break;
+                    }
+                    if (path !== undefined) {
+                        prjConfig.CustomDep_AddIncDir(new File(path));
+                    }
+                }
+            }
+        }
+    }
+    RemoveMM32CCInclude() {
+        const prjConfig = this.GetConfiguration();
+        let mm32cc_path = ToolchainManager.getInstance().getToolchainExecutableFolder('MM32CC');
+        if (mm32cc_path !== undefined && mm32cc_path.IsExist()) {
+            let path = `${mm32cc_path?.path}/../lib/clang-runtimes/armv6m_soft_nofp/include`;
+            prjConfig.CustomDep_RemoveIncDir(prjConfig.toAbsolutePath(prjConfig.toRelativePath(path)));
+            path = `${mm32cc_path?.path}/../lib/clang-runtimes/armv7m_soft_nofp/include`;
+            prjConfig.CustomDep_RemoveIncDir(prjConfig.toAbsolutePath(prjConfig.toRelativePath(path)));
+        }
+    }
+
+    GetKeilStartup<T>(prjConfig: ProjectConfiguration<T>): string | undefined {
+        let ret = this.FindFile(prjConfig.config.virtualFolder, /.*\/MDK-ARM\/startup_.*\.[S|s]$/);
+        if (ret === undefined) {
+            ret = this.FindFile(prjConfig.config.virtualFolder, /.*\/startup_.*_keil\.[S|s]$/);
+        }
+        return ret;
+    }
+    EnableFile<T>(virtualPath: string) {
+        this.unexcludeSourceFile(virtualPath);
+    }
+    DisableFile<T>(virtualPath: string) {
+        this.excludeSourceFile(virtualPath);
+    }
+    GetMM32CCStartup<T>(prjConfig: ProjectConfiguration<T>): string | undefined {
+        return this.FindFile(prjConfig.config.virtualFolder, /.*\/device\/armgcc\/startup_.*\.[S|s]$/);
+    }
+    AddFile(path: string): string | undefined {
+        let manager = this.getVirtualSourceManager();
+        let folder = manager.addFolder("MM32CC");
+        let file = manager.addFile("<virtual_root>/MM32CC", path);
+        let names = path.split('/');
+        return `<virtual_root>/MM32CC/${names[names.length - 1]}`;
+    }
+
+    FindFile(folder: VirtualFolder, pattern: RegExp): string | undefined {
+        let file = folder.files.find((file, index, files) => {
+            return pattern.test(file.path);
+        });
+        if (file !== undefined) {
+            let names = file.path.split('/');
+            return `${folder.name}/${names[names.length - 1]}`
+        }
+        for (let subfolder of folder.folders) {
+            let ret = this.FindFile(subfolder, pattern);
+            if (ret !== undefined) {
+                return `${folder.name}/${ret}`;
+            }
+        }
+        return undefined;
+    }
+
 
     setUploader(uploader: HexUploaderType, notReload?: boolean) {
         const prjConfig = this.GetConfiguration();
@@ -2192,7 +2329,7 @@ class EIDEProject extends AbstractProject {
 
         const wsConfig = new WorkspaceConfiguration(wsFile);
         const prjConfig = new ProjectConfiguration(
-            File.fromArray([wsFile.dir, AbstractProject.EIDE_DIR, AbstractProject.prjConfigName]), option.type);
+            File.fromArray([wsFile.dir, AbstractProject.EIDE_DIR, AbstractProject.prjConfigName]), option.type, option.device);
         /* const cppConfig = new CppConfiguration(
             File.fromArray([wsFile.dir, AbstractProject.vsCodeDir, AbstractProject.cppConfigName])); */
 
